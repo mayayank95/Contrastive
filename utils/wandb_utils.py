@@ -127,7 +127,7 @@ def init_wandb(args: Dict[str, Any], job_type: str = "train") -> bool:
     if isinstance(run_name, Path):
         run_name = run_name.name
     wandb.init(
-        project=args.get("wandb_project", "UncertaintyAwareVPR"),
+        project=args.get("wandb_project", "KappaPlace"),
         name=run_name,
         config=dict(args),
         job_type=job_type,

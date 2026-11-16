@@ -2,6 +2,7 @@
 # Frozen MixVPR-512 kappa head for the paper tables.
 # SF-XL place batches, 24×20, min 20, batch leave-one-out vMF.
 # The aggregator inside the kappa head stays at its build-time initialization.
+# Early stopping watches validation ECE@1 with patience 15.
 # USE_WANDB=1 turns on Weights & Biases.
 set -euo pipefail
 

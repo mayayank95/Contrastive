@@ -2,6 +2,7 @@
 # Frozen compact SALAD (544-d, dino_salad_512_32) kappa head for the paper tables.
 # Same SF-XL place batches as MixVPR: 24×20, min 20, batch leave-one-out vMF.
 # Descriptor head: no aggregator. Linear(544, 1) on the pre-L2 token and cluster sum.
+# Early stopping watches validation ECE@1 with patience 15.
 # Retrieval stays intra-normalized. USE_WANDB=1 turns on Weights & Biases.
 set -euo pipefail
 
@@ -21,7 +22,6 @@ ARGS=(
   --model_mode uncertainty
   --descriptors_dimension 544
   --resume_model "${SALAD_CKPT}"
-  --var_head_type descriptor
   --var_head_linear 1
   --variance_activation softplus
   --image_size 322

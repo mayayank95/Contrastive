@@ -2,7 +2,7 @@
 
 Training code for the frozen **MixVPR** and **SALAD** uncertainty heads in **KappaPlace**.
 
-The retrieval model stays frozen. Only the kappa head is trained, with SGD at `1e-3`, on SF-XL place batches of 24 places × 20 images. The anchor for each image is the normalized mean of the other 19 retrieval descriptors from the same place. Early stopping watches validation ECE@1 with patience 15. Training-time ECE uses percentile bins. Dataset layout and how the two repositories split the paper are in [OVERVIEW.md](OVERVIEW.md).
+The retrieval model stays frozen. Only the kappa head is trained, with SGD at `1e-3`, on SF-XL place batches of 24 places × 20 images. The anchor for each image is the normalized mean of the other 19 retrieval descriptors from the same place. Early stopping watches validation ECE@1 with patience 15. Training-time ECE uses percentile bins.
 
 ## 🛠 Setup
 
@@ -36,7 +36,7 @@ Evaluate the saved checkpoint in KappaPlace.
 
 ## ⚙️ Configuration
 
-`configs/datasets_mixvpr.json` is MixVPR-512 at 320×320 with the aggregator head. `configs/datasets_salad.json` is SALAD-544 at 322×322 with the descriptor head. JSON defaults (`--config`) merge with command-line overrides (`configs/parser.py`). `scripts/train_salad_frozen.sh` passes `--var_head_type descriptor`.
+`configs/datasets_mixvpr.json` is MixVPR-512 at 320×320 with the aggregator head. `configs/datasets_salad.json` is SALAD-544 at 322×322 with the descriptor head. JSON defaults (`--config`) merge with command-line overrides (`configs/parser.py`).
 
 Run `python train.py --help` for the full list.
 
@@ -54,7 +54,6 @@ Run `python train.py --help` for the full list.
 | `utils/` | Runtime, early stopping, W&B |
 | `scripts/` | Frozen MixVPR and SALAD training commands |
 | `validation.py` | Recall tables during training validation |
-| `OVERVIEW.md` | Repository split and dataset layout |
 
 ## ❤️ Acknowledgements
 

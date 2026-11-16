@@ -52,7 +52,7 @@ def parse_args() -> tuple[argparse.Namespace, argparse.ArgumentParser]:
 
     # Logging
     p.add_argument("--use_wandb", action="store_true", help="Enable Weights & Biases logging")
-    p.add_argument("--wandb_project", type=str, default="UncertaintyAwareVPR", help="W&B project name")
+    p.add_argument("--wandb_project", type=str, default="KappaPlace", help="W&B project name")
     p.add_argument("--wandb_run_name", type=str, default=None, help="W&B run name (default: auto from define function in runtime.py)")
 
     # Datasets
