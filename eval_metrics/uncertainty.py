@@ -22,7 +22,7 @@ def compute_score_statistics(scores) -> dict:
     """Per-query summary stats for a metric score tensor (ECE / AUC-PR inputs).
 
     For 2D+ scores (e.g. kappa ``[n_queries, dim]``), uses the mean per query.
-    For 1D per-query scores (baselines), uses the vector directly.
+    For 1D per-query scores, uses the vector directly.
     """
     arr = np.asarray(scores, dtype=np.float64)
     if arr.size == 0:

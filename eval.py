@@ -3,7 +3,6 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from eval_metrics.combined_eval import run_combined_ece_variants
 from eval_metrics.dataset_eval import eval_dataset
 from utils import commons, wandb_utils
 from utils.runtime import build_config_and_datasets, init_model
@@ -93,8 +92,7 @@ def run_eval(cfg, entries, datasets_paths, device, model) -> None:
             all_wandb_images.append(results.wandb_images)
             shared_db_desc, shared_db_var = results.db_desc, results.db_var
 
-    combined_outputs = run_combined_ece_variants(cfg, all_panel_data)
-    wandb_utils.log_eval_results(cfg, all_panel_data, all_wandb_images, combined_outputs)
+    wandb_utils.log_eval_results(cfg, all_panel_data, all_wandb_images)
     logger.info("%s\nAll processes finished.", "=" * 30)
 
 

@@ -1,26 +1,16 @@
-# MixVPR and SALAD uncertainty heads
+# Contrastive
 
-Training and evaluation for the frozen **MixVPR** and **SALAD** rows of the KappaPlace paper tables. CosPlace training and the rest of the paper code live in the KappaPlace repository.
+Training code for the frozen **MixVPR** and **SALAD** uncertainty heads in **KappaPlace**.
 
-The backbone and the retrieval aggregator stay frozen. Only the kappa head is trained, with batch leave-one-out vMF on SF-XL place batches (24 places × 20 images).
+The retrieval model stays frozen. Only the kappa head is trained, with SGD at `1e-3`, on SF-XL place batches of 24 places × 20 images. The anchor for each image is the normalized mean of the other 19 retrieval descriptors from the same place. Early stopping watches validation ECE@1 with patience 15. Training-time ECE uses percentile bins. Dataset layout and how the two repositories split the paper are in [OVERVIEW.md](OVERVIEW.md).
 
-## Runs that produce the tables
+## 🛠 Setup
 
-| Row | Encoder | Kappa head | Init |
-| --- | --- | --- | --- |
-| MixVPR-512 | Frozen ResNet-50 MixVPR, 512-d, 320×320 | Aggregator copy, then `Linear(512, 1)` and Softplus | Build-time weights. The loaded retrieval aggregator is not copied in. |
-| SALAD-544, aggregator | Frozen DINOv2 ViT-B/14 + SALAD, 544-d (`dino_salad_512_32`), 322×322 | Aggregator copy. Its forward returns the descriptor **before** the two L2 normalizations. Retrieval still returns the intra-normalized descriptor. | Same random init as MixVPR. |
-| SALAD-544, no aggregator | Same frozen SALAD | No aggregator. `Linear(544, 1)` on the pre-L2 token and cluster sum. | The linear layer's default init. |
-
-There is no flat random-image sampling, medoid target, or joint backbone training in this repo.
-
-## Setup
-
-Tested with **Python 3.9**, **PyTorch 2.8.0**, **torchvision 0.23.0**, and **CUDA 12.8**.
+Tested with **Python 3.9**, **PyTorch 2.8.0**, **torchvision 0.23.0**, and **CUDA 12.8** (cu128 wheel). Paper results used an NVIDIA driver reporting **CUDA 13.2**. A GPU is strongly recommended.
 
 ```bash
-git clone <repository-url>
-cd mixvprqsalad-cvpr
+git clone <contrastive-repository-url>
+cd contrastive
 
 python3.9 -m venv .venv
 source .venv/bin/activate
@@ -29,68 +19,50 @@ pip install torch==2.8.0 torchvision==0.23.0 --index-url https://download.pytorc
 pip install -r requirements.txt
 ```
 
-## Data
+## Contrastive training
 
-Point `data_folder` in the config at the parent of the VPR benchmarks, and `places_root` / `sfxl_train_root` at SF-XL. Layout matches KappaPlace: each benchmark has `train/`, `val/`, and `test/` with `database/` and `queries/`.
+Runnable copies are `scripts/train_mixvpr_frozen.sh` and `scripts/train_salad_frozen.sh`.
 
-SF-XL training reads `Dataframes/{city}.csv` under `places_root` (cities `SF3770`–`SF3781`). Image paths come from the `sfxl_rel_path` column, resolved under `sfxl_train_root`.
+| Row | Command |
+| --- | --- |
+| MixVPR-512, aggregator head | `MIXVPR_CKPT=path/to/mixvpr_512.pth bash scripts/train_mixvpr_frozen.sh` |
+| SALAD-544, descriptor head | `SALAD_CKPT=path/to/dino_salad_512_32.ckpt bash scripts/train_salad_frozen.sh` |
 
-| Dataset | Config name | Path under `data_folder` |
-| --- | --- | --- |
-| SF-XL | `sf_xl` | `SF-XL/processed` |
-| Pittsburgh30k | `pitts30k` | `pitts30k/images` |
-| MSLS | `msls-val` | `msls` |
-| AmsterTime | `amstertime` | `amstertime` |
-| Nordland | `nordland` | `nordland` |
-| SPED | `spedtest` | `SPEDTEST` |
-| SVOX | `svox` | `svox/images` |
+SALAD training uses the descriptor head: `Linear(544, 1)` and Softplus on the pre-L2 token and cluster sum. `USE_WANDB=1` turns on Weights & Biases. Checkpoints are written under `logs/MixVPR` or `logs/SALAD`.
 
-## Train
+## Evaluation
 
-Released checkpoints: [MixVPR](https://github.com/amaralibey/MixVPR) ResNet-50 512-d, and [SALAD](https://github.com/serizba/salad) `dino_salad_512_32`.
+Evaluate the saved checkpoint in KappaPlace.
 
-```bash
-MIXVPR_CKPT=path/to/mixvpr_512.pth ./scripts/train_mixvpr_frozen.sh
+## ⚙️ Configuration
 
-SALAD_CKPT=path/to/dino_salad_512_32.ckpt ./scripts/train_salad_frozen.sh
-VAR_HEAD=desc SALAD_CKPT=path/to/dino_salad_512_32.ckpt ./scripts/train_salad_frozen.sh
-```
+`configs/datasets_mixvpr.json` is MixVPR-512 at 320×320 with the aggregator head. `configs/datasets_salad.json` is SALAD-544 at 322×322 with the descriptor head. JSON defaults (`--config`) merge with command-line overrides (`configs/parser.py`). `scripts/train_salad_frozen.sh` passes `--var_head_type descriptor`.
 
-`VAR_HEAD=agg` is the aggregator row. `VAR_HEAD=desc` is the SALAD row without an aggregator. Both use place batches only.
+Run `python train.py --help` for the full list.
 
-## Evaluate
-
-`--var_head_type` must match the checkpoint. Add `--use_labels` for UTM recalls on benchmarks that encode pose in the path (already set in the configs).
-
-```bash
-python eval.py --config configs/datasets_mixvpr.json \
-  --resume_model path/to/mixvpr_kappa.pth \
-  --var_head_type agg
-
-python eval.py --config configs/datasets_salad.json \
-  --resume_model path/to/salad_agg_kappa.pth \
-  --var_head_type agg
-
-python eval.py --config configs/datasets_salad.json \
-  --resume_model path/to/salad_desc_kappa.pth \
-  --var_head_type descriptor
-```
-
-`eval.py` reports recall@K, ECE, and the rejection numbers used in the tables.
-
-## Layout
+## 📁 Project layout
 
 | Path | Role |
 | --- | --- |
-| `train.py` | Frozen training, batch leave-one-out vMF |
-| `eval.py` | Recall, ECE, rejection |
+| `train.py` | Frozen MixVPR and SALAD kappa-head training |
+| `eval.py` | Retrieval metrics and ECE for a saved checkpoint |
 | `configs/` | MixVPR-512 and SALAD-544 configs |
 | `models/` | MixVPR, SALAD, kappa head |
 | `data/` | SF-XL place batches and benchmark loaders |
-| `losses/` | vMF NLL and batch place-centroid targets |
-| `scripts/` | The three paper training commands |
+| `losses/` | Batch leave-one-out vMF |
+| `eval_metrics/` | ECE, retrieval, uncertainty |
+| `utils/` | Runtime, early stopping, W&B |
+| `scripts/` | Frozen MixVPR and SALAD training commands |
+| `validation.py` | Recall tables during training validation |
+| `OVERVIEW.md` | Repository split and dataset layout |
 
-## Citation
+## ❤️ Acknowledgements
+
+- [CosPlace](https://github.com/gmberton/CosPlace) — SF-XL place groups used for training.
+- [MixVPR](https://github.com/amaralibey/MixVPR) — feature-mixing aggregator (these runs use the 512-d ResNet-50 model).
+- [SALAD](https://github.com/serizba/salad) — DINOv2 optimal-transport aggregator (these runs use 544-d `dino_salad_512_32`).
+
+## 📖 Citation
 
 ```bibtex
 @article{anonymous2026kappaplace,
@@ -100,4 +72,4 @@ python eval.py --config configs/datasets_salad.json \
 }
 ```
 
-Also cite [MixVPR](https://github.com/amaralibey/MixVPR) and [SALAD](https://github.com/serizba/salad).
+Also cite [CosPlace](https://github.com/gmberton/CosPlace), [MixVPR](https://github.com/amaralibey/MixVPR), and [SALAD](https://github.com/serizba/salad).

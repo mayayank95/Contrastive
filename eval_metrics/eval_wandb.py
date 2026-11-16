@@ -17,34 +17,16 @@ UNCERTAINTY_ECE_VARIANTS = (
     ("pairwise_joint_kappa", "pairwise"),
 )
 
-# Baseline ECE bin plots (``ece_{name}_bins.png``, ``ece_pairwise_l2_bins.png``).
-BASELINE_ECE_VARIANTS = (
-    ("l2", "l2"),
-    ("l2_pairwise", "pairwise_l2"),
-    ("pa", "pa"),
-    ("sue", "sue"),
-    ("sue_log", "sue_log"),
-)
+# Rows for the ``calibration_ece`` summary (kappa ECE_R@k).
+CALIBRATION_ECE_VARIANTS = UNCERTAINTY_ECE_VARIANTS
 
-BASELINE_BINS_VARIANTS = BASELINE_ECE_VARIANTS
-
-# Rows for ``calibration_ece`` summary (learned + baseline ECE_R@k).
-CALIBRATION_ECE_VARIANTS = UNCERTAINTY_ECE_VARIANTS + BASELINE_ECE_VARIANTS
-
-# Fixed 7-slot ECE curves panel per dataset (requested dashboard layout).
 ECE_CURVES_PANEL_VARIANTS = (
     "kappa",
     "joint_kappa",
     "pairwise_joint_kappa",
-    "l2",
-    "pairwise_l2",
-    "pa",
-    "sue",
-    "sue_log",
 )
 
-# Training val loop: learned uncertainty curves only (baselines are not computed).
-UNCERTAINTY_ECE_CURVES_VARIANTS = tuple(k for k, _ in UNCERTAINTY_ECE_VARIANTS)
+UNCERTAINTY_ECE_CURVES_VARIANTS = ECE_CURVES_PANEL_VARIANTS
 
 # W&B summary panel prefix and columns (values from panel["auc_pr"]).
 AUC_PR_PANEL_KEY = "AUC-PR"
@@ -53,11 +35,6 @@ AUC_PR_SUMMARY_COLUMNS = (
     ("kappa", "kappa"),
     ("joint_kappa", "joint_kappa"),
     ("pairwise_joint_kappa", "pairwise_kappa"),
-    ("l2", "l2"),
-    ("l2_pairwise", "pairwise_l2"),
-    ("pa", "pa"),
-    ("sue", "sue"),
-    ("sue_log", "sue_log"),
 )
 
 # Score tensors summarized inside ``uncertainty_stats`` (after descriptor row).
@@ -65,23 +42,11 @@ SCORE_STAT_VARIANTS = (
     "kappa",
     "joint_kappa",
     "pairwise_joint_kappa",
-    "l2",
-    "l2_pairwise",
-    "pa",
-    "sue",
-    "sue_log",
 )
 
 SCORE_STAT_LABELS = {
     "pairwise_joint_kappa": "pairwise_kappa",
-    "l2_pairwise": "pairwise_l2",
 }
-
-
-def _ece_plot_stem(variant: str) -> str:
-    if variant == "l2_pairwise":
-        return "ece_pairwise_l2"
-    return f"ece_{variant}"
 
 
 def _recall_value_dict(arr, rv: List[int]) -> Dict[int, float]:
@@ -102,7 +67,6 @@ def _build_panel_data(
     uncertainty_ece_results: Optional[Dict[str, Any]],
     uncertainty_raw_scores: Optional[Dict[str, Any]],
     uncertainty_aucpr: Optional[Dict[str, Any]],
-    baseline_results: Optional[Dict[str, Any]],
     uncertainty_stats: Optional[Dict[str, float]],
     base_dataset_name: Optional[str] = None,
     query_folder_name: Optional[str] = None,
@@ -139,30 +103,9 @@ def _build_panel_data(
         if "ece_ap" in ece_result:
             panel["ece_ap"][variant] = float(ece_result["ece_ap"])
 
-    if baseline_results:
-        baseline_raw = baseline_results.get("raw_scores") or {}
-        for variant in ("l2", "pa", "sue", "sue_log"):
-            ece = baseline_results.get(f"ece_{variant}")
-            if isinstance(ece, dict):
-                panel["ece_recall"][variant] = {int(k): float(val) for k, val in ece.items()}
-                if baseline_raw.get(variant) is not None:
-                    panel["raw_scores"][variant] = baseline_raw[variant]
-        pair = baseline_results.get("ece_l2_pairwise")
-        if isinstance(pair, dict) and "ece_recall" in pair:
-            panel["ece_recall"]["l2_pairwise"] = {
-                int(k): float(val) for k, val in pair["ece_recall"].items()
-            }
-            if baseline_raw.get("l2_pairwise") is not None:
-                panel["raw_scores"]["l2_pairwise"] = baseline_raw["l2_pairwise"]
-
     if uncertainty_aucpr:
         for variant in ("kappa", "joint_kappa", "pairwise_joint_kappa"):
             v = uncertainty_aucpr.get(variant)
-            if isinstance(v, (int, float, np.floating)):
-                panel["auc_pr"][variant] = float(v)
-    if baseline_results:
-        for variant in ("l2", "l2_pairwise", "pa", "sue", "sue_log"):
-            v = baseline_results.get(variant)
             if isinstance(v, (int, float, np.floating)):
                 panel["auc_pr"][variant] = float(v)
 
@@ -235,10 +178,6 @@ def panel_to_wandb_metrics(
         for name, v in compute_score_statistics(raw).items():
             wandb_metrics[f"{prefix}{variant}_{name}"] = float(v)
 
-    rb = panel.get("random_baseline")
-    if isinstance(rb, (int, float, np.floating)):
-        wandb_metrics[f"{prefix}auc_pr_random_baseline"] = float(rb)
-
     return wandb_metrics
 
 
@@ -273,18 +212,13 @@ def _bins_png_path(
     variant_key: str,
     *,
     plot_prefix: Optional[str],
-    baseline: bool,
 ) -> Path:
-    """Resolve ECE bin-count plot path (matches ``compute_ece`` / combined ``plot_prefix`` names)."""
+    """Resolve ECE bin-count plot path (matches ``compute_ece`` ``plot_prefix`` names)."""
     if plot_prefix:
-        if baseline:
-            if variant_key == "l2_pairwise":
-                return output_dir / f"{plot_prefix}_pairwise_l2_bins.png"
-            return output_dir / f"{plot_prefix}_{variant_key}_bins.png"
         if variant_key == "kappa":
             return output_dir / f"{plot_prefix}_bins.png"
         return output_dir / f"{plot_prefix}_{variant_key}_bins.png"
-    return output_dir / f"{_ece_plot_stem(variant_key)}_bins.png"
+    return output_dir / f"ece_{variant_key}_bins.png"
 
 
 def _curve_png_path(
@@ -428,20 +362,13 @@ def collect_bins_distribution_images(
     *,
     plot_prefix: Optional[str] = None,
 ) -> Dict[str, Path]:
-    """Collect ``*_bins.png`` for uncertainty ECE and baseline ECE variants."""
+    """Collect ``*_bins.png`` for kappa ECE variants."""
     if output_dir is None or not output_dir.exists():
         return {}
 
     images: Dict[str, Path] = {}
     for variant_key, variant_label in UNCERTAINTY_ECE_VARIANTS:
-        path = _bins_png_path(
-            output_dir, variant_key, plot_prefix=plot_prefix, baseline=False
-        )
-        if path.exists():
-            images[variant_label] = path.resolve()
-
-    for variant_key, variant_label in BASELINE_BINS_VARIANTS:
-        path = _bins_png_path(output_dir, variant_key, plot_prefix=plot_prefix, baseline=True)
+        path = _bins_png_path(output_dir, variant_key, plot_prefix=plot_prefix)
         if path.exists():
             images[variant_label] = path.resolve()
 
@@ -717,14 +644,12 @@ def _html_table(
 
 
 # Variant labels in ``calibration_ece`` / ``uncertainty_stats`` rows (column 1).
-_CALIBRATION_MAIN_VARIANT_LABELS = frozenset(
-    {"kappa", "joint_kappa", "l2", "pa", "sue_log"}
-)
-_CALIBRATION_PAIRWISE_VARIANT_LABELS = frozenset({"pairwise_l2", "pairwise"})
+_CALIBRATION_MAIN_VARIANT_LABELS = frozenset({"kappa", "joint_kappa"})
+_CALIBRATION_PAIRWISE_VARIANT_LABELS = frozenset({"pairwise"})
 
 # ``AUC-PR`` table column headers (one row per dataset).
-_AUC_PR_MAIN_COLUMNS = frozenset({"kappa", "joint_kappa", "l2", "pa", "sue_log"})
-_AUC_PR_PAIRWISE_COLUMNS = frozenset({"pairwise_l2", "pairwise_kappa"})
+_AUC_PR_MAIN_COLUMNS = frozenset({"kappa", "joint_kappa"})
+_AUC_PR_PAIRWISE_COLUMNS = frozenset({"pairwise_kappa"})
 
 # Tables that compare calibration methods (bold best per group in summary HTML).
 _CALIBRATION_COMPARISON_TABLE_KEYS = frozenset(
@@ -785,7 +710,7 @@ def _build_uncertainty_stats_table(
     all_panel_data: List[Dict[str, Any]],
     combined_panels: Optional[List[Dict[str, Any]]] = None,
 ) -> Optional[Tuple[List[str], List[List[Any]]]]:
-    """Per-metric score stats used for ECE / AUC-PR (kappa, baselines, …)."""
+    """Per-metric score stats used for ECE / AUC-PR."""
     entries: List[Tuple[str, str, Dict[str, float]]] = []
 
     for d in all_panel_data:
@@ -947,7 +872,6 @@ def build_eval_outputs(
     uncertainty_ece_results,
     uncertainty_raw_scores,
     uncertainty_aucpr,
-    baseline_results,
     uncertainty_stats,
     dataset_output_dir: Optional[Path] = None,
     save_plots: bool = False,
@@ -963,7 +887,6 @@ def build_eval_outputs(
         uncertainty_ece_results,
         uncertainty_raw_scores,
         uncertainty_aucpr,
-        baseline_results,
         uncertainty_stats,
         base_dataset_name=base_dataset_name,
         query_folder_name=query_folder_name,

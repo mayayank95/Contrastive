@@ -229,8 +229,8 @@ def parse_args() -> tuple[argparse.Namespace, argparse.ArgumentParser]:
     p.add_argument("--var_head_type", type=str, default=None, choices=["descriptor", "agg"],
         help="agg: randomly initialized aggregator copy on the backbone map, then Linear "
         "and Softplus. descriptor: no aggregator; Linear on the descriptor "
-        "(SALAD reads the pre-L2 token and cluster sum). MixVPR paper runs use agg. "
-        "The SALAD no-aggregator run uses descriptor.")
+        "(SALAD reads the pre-L2 token and cluster sum). MixVPR uses agg. "
+        "SALAD uses descriptor.")
     p.add_argument("--var_head_linear", type=str, default="1", choices=["none", "d", "1"],
         help="Linear layer in the variance head: 'none' (no Linear), "
         "'d' (Linear(fc_output_dim, fc_output_dim)), or '1' (Linear(fc_output_dim, 1)).")
@@ -258,7 +258,6 @@ def parse_args() -> tuple[argparse.Namespace, argparse.ArgumentParser]:
     )
     p.add_argument("--save_descriptors", action="store_true", help="Save extracted descriptors to disk")
     p.add_argument("--skip_auc_pr", action="store_true", help="Skip expensive uncertainty AUC-PR calculations in eval.py.")
-    p.add_argument("--skip_baselines", action="store_true", help="Skip expensive baseline calculations (L2, PA-score, SUE) in eval.py.")
     p.add_argument("--ece_metrics", type=str, default="recall",
         help="ECE metrics to compute (comma-separated). Default: recall only. Options: recall, map, ap.")
     p.add_argument("--ece_zoom_threshold", type=float, default=0.001,
@@ -456,8 +455,11 @@ def normalize(merged: Dict[str, Any]) -> Dict[str, Any]:
         )
     if method == "mixvpr" and out["var_head_type"] != "agg":
         raise ValueError(
-            "Frozen MixVPR uses the aggregator head (--var_head_type agg). "
-            "The descriptor head is the SALAD no-aggregator run."
+            "Frozen MixVPR uses the aggregator head (--var_head_type agg)."
+        )
+    if method == "salad" and out["var_head_type"] != "descriptor":
+        raise ValueError(
+            "Frozen SALAD uses the descriptor head (--var_head_type descriptor)."
         )
     out["var_head_agg"] = out["var_head_type"] == "agg"
     out["var_head_linear"] = str(out.get("var_head_linear", "d")).lower()

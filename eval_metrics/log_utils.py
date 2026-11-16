@@ -1,10 +1,8 @@
 """Shared logging helpers for evaluation metric summaries."""
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
-
-from eval_metrics.uncertainty import compute_variance_summary
 
 logger = logging.getLogger(__name__)
 
@@ -78,67 +76,3 @@ def log_metric_summary(
         logger.info("  AUC-PR: %.4f", auc_pr)
 
 
-def _panel_variant_names(panel: Dict[str, Any]) -> List[str]:
-    """Variant order follows ``ece_recall`` insertion order from combined eval, then any AUC-only keys."""
-    names = list(panel.get("ece_recall") or {})
-    auc_only = (set(panel.get("auc_pr_norm_per_dataset") or {}) | set(panel.get("auc_pr_norm_global") or {})) - set(names)
-    names.extend(sorted(auc_only))
-    return names
-
-
-def log_combined_panel(name: str, panel: Dict[str, Any]) -> None:
-    """Log combined ECE and dual-normalization AUC-PR per variant."""
-    logger.info("\033[1m%s\033[0m", name)
-
-    recalls = panel.get("recalls") or {}
-    if recalls:
-        keys = sorted(recalls)
-        logger.info(
-            "  Recall@%s: %s",
-            "/".join(str(k) for k in keys),
-            "/".join(f"{float(recalls[k]):.2f}" for k in keys),
-        )
-
-    auc_pd = panel.get("auc_pr_norm_per_dataset") or {}
-    auc_g = panel.get("auc_pr_norm_global") or {}
-
-    for variant in _panel_variant_names(panel):
-        ece_payload: Dict[str, Any] = {}
-        if variant in panel.get("ece_recall", {}):
-            ece_payload["ece_recall"] = panel["ece_recall"][variant]
-        if variant in panel.get("ece_map", {}):
-            ece_payload["ece_map"] = panel["ece_map"][variant]
-        if variant in panel.get("ece_ap", {}):
-            ece_payload["ece_ap"] = panel["ece_ap"][variant]
-
-        logger.info("\033[1m  %s\033[0m", variant)
-        if ece_payload:
-            logger.info("    %s", format_ece(ece_payload))
-        if variant in auc_pd:
-            logger.info("    AUC-PR (norm_per_dataset): %.4f", float(auc_pd[variant]))
-        if variant in auc_g:
-            logger.info("    AUC-PR (norm_global): %.4f", float(auc_g[variant]))
-
-
-def log_baseline_summary(
-    name: str,
-    ece_result: Optional[Dict[str, Any]],
-    scores: np.ndarray,
-    auc_pr: Optional[float] = None,
-    *,
-    ece_only: bool = False,
-) -> None:
-    """Log summary for a baseline metric (confidence rows only)."""
-    logger.info("\033[1m%s\033[0m", name)
-    logger.info("  %s", format_ece(ece_result))
-    if ece_only:
-        return
-    score_stats = ece_result.get("score_stats") if isinstance(ece_result, dict) else None
-    if score_stats:
-        log_stats("confidence (after clamp)", score_stats["confidence_after_clamp"])
-        log_stats("confidence (before clamp)", score_stats["confidence_before_clamp"], debug=True)
-    else:
-        log_stats("confidence (after clamp)", compute_variance_summary(scores))
-        log_stats("confidence (before clamp)", compute_variance_summary(scores), debug=True)
-    if auc_pr is not None:
-        logger.info("  AUC-PR: %.4f", auc_pr)

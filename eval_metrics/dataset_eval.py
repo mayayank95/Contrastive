@@ -19,7 +19,6 @@ from eval_metrics.joint_kappa import compute_joint_kappa
 from eval_metrics.log_utils import log_metric_summary
 from eval_metrics.retrieval import log_retrieval_results, run_retrieval
 from eval_metrics.uncertainty import compute_auc_pr, compute_uncertainty_statistics
-from eval_metrics.baselines import compute_baselines
 
 logger = logging.getLogger(__name__)
 
@@ -243,7 +242,7 @@ def evaluate_from_descriptors(
         save_recalls=save_recalls,
     )
 
-    uncertainty_aucpr = baseline_results = uncertainty_stats = None
+    uncertainty_aucpr = uncertainty_stats = None
     uncertainty_ece_results: Dict[str, Any] = {}
     uncertainty_raw_scores: Dict[str, Any] = {}
     save_plots = args.get("save_plots", False) or args.get("use_wandb", False)
@@ -266,25 +265,6 @@ def evaluate_from_descriptors(
                 wandb_step,
             )
         )
-        if (
-            args["use_labels"]
-            and positives_per_query is not None
-            and wandb_step is None
-            and not args.get("skip_baselines")
-        ):
-            logger.info("Computing baselines...")
-            baseline_results = compute_baselines(
-                predictions,
-                positives_per_query,
-                distances,
-                database_utms=getattr(test_ds, "database_utms", None),
-                n_values=args.get("recall_values"),
-                output_dir=dataset_output_dir if save_plots else None,
-                zoom_threshold=args.get("ece_zoom_threshold", 0.001),
-                bin_mode=args.get("ece_bin_mode", "zoom"),
-                skip_auc_pr=args.get("skip_auc_pr", False),
-            )
-
     if save_plots and args.get("num_preds_to_save", 0) != 0:
         preds_to_save = predictions[:, : args["num_preds_to_save"]]
         pred_distances = distances[:, : args["num_preds_to_save"]]
@@ -312,7 +292,6 @@ def evaluate_from_descriptors(
         uncertainty_ece_results,
         uncertainty_raw_scores,
         uncertainty_aucpr,
-        baseline_results,
         uncertainty_stats,
         dataset_output_dir=dataset_output_dir,
         save_plots=save_plots,

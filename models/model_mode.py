@@ -63,8 +63,7 @@ def _resolve_var_head_type(opt) -> str:
 def _disable_dropout(module: nn.Module) -> None:
     """Replace Dropout with Identity so train/eval κ is deterministic.
 
-    Used on the var_head aggregator copy only. MixVPR has no dropout; SALAD's
-    0.3 dropout stays on the frozen descriptor aggregator.
+    Used on the MixVPR var_head aggregator copy. MixVPR has no dropout.
     """
     for name, child in list(module.named_children()):
         if isinstance(child, nn.Dropout):
@@ -84,9 +83,6 @@ def _build_var_head(opt, fc_output_dim, aggregation=None):
     if head_type == "agg":
         assert aggregation is not None, "var_head_agg=True requires the aggregation module"
         agg_copy = copy.deepcopy(aggregation)
-        if str(opt.get("method", "")).lower() == "salad":
-            # This copy's forward returns prenorm. Retrieval keeps return_prenorm False.
-            agg_copy.return_prenorm = True
         _disable_dropout(agg_copy)
         layers.append(agg_copy)
         tag = "agg"

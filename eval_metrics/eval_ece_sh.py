@@ -39,8 +39,7 @@ def mean_query_uncertainty(
     return mu
 
 
-# ``percentile_two_sided`` is selected per-call by the caller (via the ``--ece_two_sided``
-# config flag for learned heads; baselines always pass False explicitly).
+# ``percentile_two_sided`` is selected per-call by the caller via ``--ece_two_sided``.
 PERCENTILE_CLIP_PCT = 1.0  # clip 1% tail(s): two-sided → [p1, p99]; one-sided → hi at p99
 
 

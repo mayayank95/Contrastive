@@ -24,7 +24,7 @@
   "uncertainty_loss": "vmf",
   "uncertainty_lambda": 1.0,
   "head_lr": 0.001,
-  "var_head_type": "agg",
+  "var_head_type": "descriptor",
   "var_head_linear": "1",
   "variance_activation": "softplus",
   "batch_size": 24,

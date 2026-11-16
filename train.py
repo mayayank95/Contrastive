@@ -85,7 +85,6 @@ class VPRModel(pl.LightningModule):
                 if isinstance(m, torch.nn.BatchNorm2d):
                     m.eval()
         # SALAD's frozen aggregator uses dropout. Eval keeps the released descriptor.
-        # The var_head copy stays in train mode.
         if self.freeze_base and str(self._eval_cfg.get("method", "")).lower() == "salad":
             self.backbone.eval()
             self.aggregator.eval()
